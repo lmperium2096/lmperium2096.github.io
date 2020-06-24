@@ -1,0 +1,51 @@
+/*@font-face {
+    font-family: 'runescape_uf';
+    font-style: normal;
+    font-weight: normal;
+    src: url('fonts/runescape_uf.ttf') format('truetype');
+}*/
+
+html {
+    
+}
+
+h3 {
+    margin: 10px 0;
+    
+}
+
+.flex-container * {
+    /*border: 1px solid black;*/
+}
+
+.flex-container{
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.form-box {
+    display: flex;
+    flex-direction: column;
+    align-content: flex-start;
+}
+
+.form-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.flex-container .form-box {
+    padding: 10px 10px;
+}
+
+#ping-display {
+    padding: 3px 5px 0 5px;
+    border: 1px solid #888;
+}
+
+input[type="range"] {
+  width:100px;
+}

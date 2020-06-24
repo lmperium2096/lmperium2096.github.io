@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Verzik Phase 2 Trainer</title>
+        <meta name="description" content="A page to help practice Verzik timing.">
+        <meta name="viewport" content="width=device-width">
+
+        <link rel="icon" href="favicon.ico" type="image/x-icon" />
+        <link rel="stylesheet" href="css/normalize.css">
+        <link rel="stylesheet" href="css/main.css">
+    </head>
+    <body onresize="resize()">
+        <div class="canvas-wrapper">
+            <div class="flex-container">
+                <div>
+                    <canvas id="tile-board" tabindex="1"></canvas>
+                </div>
+                <div class="form-box">
+                    <h3>Options:</h3>
+                    <form>
+                        <input type="hidden" id="refreshed" value="0">
+                        <div class="form-line">
+                            <span><label for="weapon-select">Select weapon</label>
+                            <select id="weapon-select" onchange="updateWeaponSelect(this.id)">
+                                <option value="SCYTHE">scythe</option>
+                                <option value="WHIP">whip</option>
+                            </select></span></div>
+                        <br>
+                        <div class="form-line">
+                            <span><label for="tile-marker-type">Tile marker style</label>
+                                <select id="tile-marker-type" onchange="updateValue(this.id)">
+                                    <option value="none">none</option>
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                </select></span>
+                            <input type="color" id="color-tile-marker" onchange="updateValue(this.id)"></div>
+                        <div class="form-line">
+                            <span><input type="checkbox" id="show-verzik-tiles" onchange="updateBoolean(this.id)">
+                                <label for="show-verzik-tiles">Show Verzik tiles</label></span>
+                            <input type="color" id="color-verzik-marker" onchange="updateValue(this.id)"></div>
+                        <div class="form-line">
+                            <span><input type="checkbox" id="show-melee-tiles" onchange="updateBoolean(this.id)">
+                                <label for="show-melee-tiles">Show melee range tiles</label></span>
+                            <input type="color" id="color-melee-marker" onchange="updateValue(this.id)"></div>
+                        <br>
+                        <div class="form-line">
+                            <span><input type="checkbox" id="show-tile-indicators" onchange="updateBoolean(this.id)" checked >
+                                <label for="show-tile-indicators">Show tile indicators</label></span>
+                            <input type="color" id="color-tile-indicator" onchange="updateValue(this.id)"></div>
+                        <div class="form-line">
+                            <span><input type="checkbox" id="show-path-tiles" onchange="updateBoolean(this.id)" checked >
+                                <label for="show-path-tiles">Show path tiles</label></span></div>
+                        <br>
+                        <div class="form-line">
+                            <label for="ping-select">Set ping</label>
+                            <span id="ping-display">30 ms</span>
+                            <input type="range" id="ping-select" value="30" min="10" max="350" onchange="updatePing()"></div>
+                    </form>
+                </div>
+            </div>
+            <p align="center">
+                <button id="pause_btn" onclick="pause_play()">Play</button>
+                <button id="reset_btn" onclick="reset_verzik()">Reset Verzik</button>
+            </p>
+        </div>
+        <script type="text/javascript" src="js/trainer.js"></script>
+    </body>
+</html>
