@@ -1,4 +1,31 @@
 
+const img_path = "./img/";
+const img_ext = ".png";
+const sounds_path = "./sounds/";
+const sounds_ext = ".m4a";
+
+var numAssetsToLoad = 0;
+var imgs = {};
+const img_ = {
+    tile_board: "",
+    whip: {idle: "", attack: ["0","1","2","3","4","5","6","7","8","9"]},
+    scythe: {idle: "", attack: ["0","1","2","3","4","5","6","7","8","9"]},
+    birds: ["0","1","2","3","4","5"],
+    hitsplat: {25:""},
+    verzik: {idle: ["0","1","2","3","4","5","6","7"],
+            attack: ["0","1","2","3","4","5","6","7","8","9"]},
+    bomb: {f:  ["0","1","2","3","4","5"],
+           e:  ["0","1","2","3","4","5","6","7","8"]}
+};
+var sounds = {};
+const sounds_ = {
+    scythe: "",
+    whip: "",
+    verzik_range: "",
+    verzik_bounce: "",
+    verzik_hit: ""
+};
+
 const cycle_length = 100; // .1 seconds per animation cycle, 10 fps
 const cycles_per_tick = 6;
 const tick_length = cycle_length * cycles_per_tick;
@@ -28,42 +55,6 @@ const weapons = {
     "WHIP": whip
 };
 
-const img_path = "./img/";
-const img_idle = "_idle";
-const img_attack = [
-  "_attack_0", "_attack_1", "_attack_2", "_attack_3", "_attack_4",
-  "_attack_5", "_attack_6", "_attack_7", "_attack_8", "_attack_9"
-];
-const birds_img = [
-    "birds_0.png", "birds_1.png", "birds_2.png",
-    "birds_3.png", "birds_4.png", "birds_5.png"
-];
-const verzik_idle = [
-    "_idle_0", "_idle_1", "_idle_2", "_idle_3",
-    "_idle_4", "_idle_5", "_idle_6", "_idle_7"
-];
-const verzik_attack = [
-    "_attack_0", "_attack_1", "_attack_2", "_attack_3", "_attack_4",
-    "_attack_5", "_attack_6", "_attack_7", "_attack_8"
-];
-const bomb_f = [
-    "bomb_f0.png", "bomb_f1.png", "bomb_f2.png", 
-    "bomb_f3.png", "bomb_f4.png", "bomb_f5.png"
-];
-const bomb_e = [
-    "bomb_e0.png", "bomb_e1.png", "bomb_e2.png",
-    "bomb_e3.png", "bomb_e4.png", "bomb_e5.png",
-    "bomb_e6.png", "bomb_e7.png", "bomb_e8.png"
-];
-
-const sounds = {
-    scythe: "./sounds/scythe_attack.m4a",
-    whip: "./sounds/whip_attack.m4a",
-    verz_range: "./sounds/verzik_range_attack.m4a",
-    verz_bounce: "./sounds/verzik_bounce_attack.m4a",
-    verz_hit: "./sounds/verzik_tank_hit.m4a"
-};
-
 var booleans = {
     "show-verzik-tiles": false,
     "show-melee-tiles": false,
@@ -85,10 +76,10 @@ var ping = 30;
 var canvas = $("tile-board");
 var ctxt = canvas.getContext("2d");
 
-var board_img = new Image();
-board_img.src = "./img/tile_board_lg3.png";
 
 /// variables that are reset with init();
+
+var board_img;
 
 var cycles; //count .1 second intervals
 var ticks;  //count ticks
@@ -112,7 +103,7 @@ class Point {
 
     /**
      * Returns the number of tile movements between this point and p
-     * 
+     *
      * @param {Point} p is a Point, or any object with an x and y field
      * @returns {Number}
      */
@@ -120,15 +111,15 @@ class Point {
         if (p === null) return null;
         return Math.max(Math.abs(this.x - p.x), Math.abs(this.y - p.y));
     }
-    
+
     /**
      * Returns the biased distance between this point and point p.
-     * 
+     *
      * For distances with the same number of tile movements, this function
      * always returns a lesser value for left(westward) distances than for
      * right(eastward) distances, and a lesser value for right distances than
      * for up or down distances.  This is to mimic the pathing in osrs.
-     * 
+     *
      * @param {Point} p is a Point, or any object with an x and y field
      * @returns {Number}
      */
@@ -160,20 +151,20 @@ class Player  {
         this.stun_timer = 0;
         this.stun_birds = null;
     }
-    
+
     //center of animation in terms of tile
     getAnimCenter() {
         return new Point((this.anim_pos.x + .5), (this.anim_pos.y + .5));
     }
-    
+
     //center in terms of pixel
     getCenterPixel() {
         return new Point((this.position.x + .5) * tile_size, (this.position.y + .5) * tile_size);
     }
-    
+
     /**
      * Calculates the target tile from the given click_target
-     * 
+     *
      * @param click_target can be either an NPC or a Point
      * @returns {Point} target_tile
      */
@@ -198,9 +189,9 @@ class Player  {
     setTargetTile(click_target) {
         this.target_tile = this.calcTargetTile(click_target);
     }
-    
+
     tick() {
-        
+
         if (this.stun_timer) {
             this.stun_timer--;
             //log movement
@@ -221,7 +212,7 @@ class Player  {
                 this.path_tiles = generate_path(this.position, this.target_tile_server);
                 recent_click = null;
             }
-            
+
             //save prev position
             this.prev_pos = new Point(this.position.x, this.position.y);
 
@@ -253,35 +244,33 @@ class Player  {
             }
         }
     }
-    
+
     canAttack() {
         return this.attack_target && !this.target_tile_server && this.attack_cd === 0;
     }
-    
+
     performAttack() {
         console.log(`Attack! with ${this.weapon.NAME}`);
 
         this.attack_cd += this.weapon.CD;
-        this.animation_frames = [...img_attack];
-        
-        this.attack_audio = new Audio();
-        this.attack_audio.volume = .2;
-        this.attack_audio.src = sounds[this.weapon.NAME];
-        this.attack_audio.play();
+        this.animation_frames = [...imgs[this.weapon.NAME].attack];
+
+//        this.attack_audio = sounds[this.weapon.NAME];
+//        this.attack_audio.play();
         this.attack_target.hit(this.weapon);
     }
-    
+
     hit(dmg) {
         this.hitsplat = new HitSplat(dmg);
         setTimeout(()=>{
             this.hitsplat = null;
         }, 2 * tick_length);
     }
-    
+
     stun(t) {
         this.stun_timer = t;
         this.stun_birds = new StunBirds();
-        
+
         this.target_tile = null;
         this.target_tile_server = null;
         this.path_tiles = [];
@@ -289,11 +278,11 @@ class Player  {
         this.focus_angle = null;
         this.anim_angle = Math.atan2(this.position.y-(this.prev_pos.y),this.position.x-(this.prev_pos.x));
     }
-    
+
     animate() {
         //update image
-        this.img.src = this.getImgPath();
-        
+        this.img = this.getImg();
+
         let focus_point;
         //set focus_point
         if (this.attack_target) { //if there's an attack target, point character towards it
@@ -326,13 +315,13 @@ class Player  {
             }
         }
     }
-    
-    getImgPath() {
+
+    getImg() {
         let anim_frame = this.animation_frames.shift();
-        if (!anim_frame) anim_frame = "_idle";
-        return `${img_path}${this.weapon.NAME}${anim_frame}`;
+        if (!anim_frame) anim_frame = imgs[this.weapon.NAME].idle;
+        return anim_frame;
     }
-    
+
     draw(context) {
         context.translate((this.anim_pos.x +.5)*tile_size,(this.anim_pos.y +.5)*tile_size);
         context.rotate(this.anim_angle);
@@ -342,15 +331,14 @@ class Player  {
         if (this.hitsplat) this.hitsplat.drawInPlace(context);
         context.translate(-(this.anim_pos.x +.5)*tile_size,-(this.anim_pos.y +.5)*tile_size);
     }
-    
+
 }
 
 class HitSplat {
     constructor(dmg) {
-        this.img = new Image();
-        this.img.src = `${img_path}hitsplat_${dmg}.png`;
+        this.img = imgs.hitsplat[dmg];
     }
-    
+
     drawInPlace(context) {
         drawImgCentered(context, this.img);
     }
@@ -359,20 +347,20 @@ class HitSplat {
 class StunBirds {
     constructor() {
         this.img = new Image();
-        this.animation_frames = [...birds_img];
+        this.animation_frames = [...imgs.birds];
     }
-    
-    getImgPath() {
+
+    getImg() {
         let anim_frame = this.animation_frames.shift();
         if (!anim_frame) {
-            this.animation_frames = [...birds_img];
+            this.animation_frames = [...imgs.birds];
             anim_frame = this.animation_frames.shift();
         }
-        return `${img_path}${anim_frame}`;
+        return anim_frame;
     }
-    
+
     drawInPlace(context) {
-        this.img.src = this.getImgPath();
+        this.img = this.getImg();
         drawImgCentered(context, this.img);
     }
 }
@@ -382,7 +370,7 @@ class NPC {
         this.pos = new Point(pos.x, pos.y);
         this.size = size;   //size x size tiles
         this.isNpc = true;
-        
+
         this.attack_target = null;  //the player being targetted for attack
         this.target_loc = null;     //the location of the attack_target when targetted
         this.range_att = false;     //true if attack_target will receive a range attack
@@ -391,30 +379,30 @@ class NPC {
         this.angle = 0;             //the direction in which the npc is facing
         this.prev_angle = 0;
         this.attack_speed = 4;
-        this.img = new Image();
-        this.animation_frames = [...verzik_idle];
+        this.img;
+        this.animation_frames = [];
         this.attack_audio = null;
         this.attack_cycle = 4;      //attack cycle counter in ticks
     }
-    
+
     target(player) {
         this.attack_target = player;
     }
-    
+
     //center in terms of tiles
     getAnimCenter() {
         return new Point(this.pos.x + this.size/2, this.pos.y + this.size/2);
     }
-    
+
     //center in terms of pixel
     getCenterPixel() {
         return new Point((this.pos.x + this.size/2) * tile_size, (this.pos.y + this.size/2) * tile_size);
     }
-    
+
     tick() {
         this.attackCycle();
     }
-    
+
     attackCycle() {
         switch (this.attack_cycle--) {
             case 3:
@@ -436,33 +424,31 @@ class NPC {
                 this.performAttack();
         }
     }
-    
+
     performAttack() {
         console.log(`Attack! from verzik`); //TODO
         this.attack_cycle += this.attack_speed;
-        this.attack_audio = new Audio();
-        this.attack_audio.volume = .2;
         if (this.bounce_att) {  //bounce attack if in melee range
             this.bounceAttack(this.attack_target);
         } else {                //range attack if outside of bounce range
             this.rangeAttack(this.attack_target);
         }
     }
-    
+
     checkInBounceRange(p) {
         let tiles = this.getTilesInAttackRange(1);
         let returnBool = false;
-        
+
         for (let tile of tiles) {
             if (tile.dist(p) === 0) {
                 returnBool = true;
                 break;
             }
         }
-        
+
         return returnBool;
     }
-    
+
     bounceAttack(attack_target) {
         let bounce_tile = null;
         let tiles = this.getTilesAtRange(4);
@@ -474,55 +460,55 @@ class NPC {
                 bounce_tile = tile;
             }
         }
-        
+
         attack_target.position = bounce_tile;
-        
+
         attack_target.hit(25);
         attack_target.stun(8);
-        
-        this.animation_frames = [...verzik_attack]; //TODO add bounce anim
-        this.attack_audio.src = sounds.verz_bounce;
+
+        this.animation_frames = [...imgs.verzik.attack]; //TODO add bounce anim
+        this.attack_audio = sounds.verzik_bounce.cloneNode();
+        this.attack_audio.volume = .2;
         this.attack_audio.play();
     }
-    
+
     rangeAttack(attack_target) {
-        
-        this.animation_frames = [...verzik_attack];
-        this.attack_audio.src = sounds.verz_range;
+
+        this.animation_frames = [...imgs.verzik.attack];
+        this.attack_audio = sounds.verzik_range.cloneNode();
+        this.attack_audio.volume = .2;
         this.attack_audio.play();
     }
-    
+
     hit(wep) {
-        let defend_audio = new Audio();
-        defend_audio.volume = .2;
-        defend_audio.src = sounds.verz_hit;
+        let defend_audio = sounds.verzik_hit;
         defend_audio.play();
     }
-    
+
     animate() {
         //update image
-        this.img.src = this.getImgPath();
-        
+        this.img = this.getImg();
+
         //set focus_point :: assuming there's always an attack_target
         let focus_point = this.attack_target.getAnimCenter();
-        
+
         //set this.angle :: assuming npc doesn't move
         let cp = this.getAnimCenter();
         this.focus_angle = Math.atan2(focus_point.y - (cp.y), focus_point.x - (cp.x));
         this.angle = this.focus_angle;
-        
+
         if (this.range_bomb) this.range_bomb.animate();
     }
-    
-    getImgPath() {
+
+    getImg() {
         let anim_frame = this.animation_frames.shift();
         if (!anim_frame) {
-            this.animation_frames = [...verzik_idle];
+            this.animation_frames = [...imgs.verzik.idle];
             anim_frame = this.animation_frames.shift();
         }
-        return `${img_path}verzik${anim_frame}`;
+        return anim_frame;
     }
-    
+
     draw(context) {
         let center = this.getCenterPixel();
         context.beginPath();
@@ -533,23 +519,23 @@ class NPC {
         context.arc(center.x, center.y, .9*tile_size*this.size/2, 0, 2 * Math.PI);
         context.fillStyle = '#00000010';
         context.fill();
-        
+
         let cp = this.getCenterPixel();
         context.translate(cp.x, cp.y);
         context.rotate(this.angle);
         drawImgCentered(context, this.img);
         context.rotate(-this.angle);
         context.translate(-cp.x, -cp.y);
-        
+
         if (this.range_bomb) this.range_bomb.draw(context);
     }
-    
+
     /**
      * Tests a point, p, to see if it's within the click area of this npc.
-     * 
+     *
      * It is within the click area iff it's within a circle with diameter of
      * this.size which is centered at getCenterPixel().
-     * 
+     *
      * @param {Point} p the Point to test
      * @returns {boolean} true iff p is within size/2 units of getCenterPixel()
      */
@@ -557,10 +543,10 @@ class NPC {
         let center = this.getCenterPixel();
         return (this.size * tile_size / 2) > Math.sqrt((p.x - center.x) * (p.x - center.x) + (p.y-center.y) * (p.y-center.y));
     }
-    
+
     /**
      * Returns an array of Points that are exactly r tiles away from NPC
-     * 
+     *
      * @param {int} r the attack range of this NPC
      * @returns {Array|NPC.getTilesInAttackRange.tiles}
      */
@@ -575,10 +561,10 @@ class NPC {
         }
         return tiles;
     }
-    
+
     /**
      * Returns an array of Points within this NPC's attack range
-     * 
+     *
      * @param {int} r the attack range of this NPC
      * @returns {Array|NPC.getTilesInAttackRange.tiles}
      */
@@ -593,10 +579,10 @@ class NPC {
         }
         return tiles;
     }
-    
+
     /**
      * Returns an array of Points from which this NPC is attackable
-     * 
+     *
      * @param {int} r the attack range of the attacker
      * @returns {Array|NPC.getTilesInAttackableRange.tiles}
      */
@@ -624,22 +610,22 @@ class RangeBomb {
         this.npc_center = npc.getAnimCenter();
         this.player = player;
         this.target_tile = location;
-        this.img = new Image();
+        this.img = null;
         this.angle = Math.atan2(this.target_tile.y+.5-(this.npc_center.y),this.target_tile.x+.5-(this.npc_center.x));
         this.location = null;
-        this.animation_frames = [...bomb_f];
+        this.animation_frames = [...imgs.bomb.f];
     }
-    
+
     detonate() {
         this.detonated = true;
-        this.animation_frames = [...bomb_e];
+        this.animation_frames = [...imgs.bomb.e];
         if (this.player.prev_pos.dist(this.target_tile) === 0) {
             this.player.hit(25);
         }
     }
-    
+
     animate() {
-        this.img.src = this.getImgPath();
+        this.img = this.getImg();
         if (this.detonated) {
             this.anim_pos = {x: this.target_tile.x+.5, y: this.target_tile.y+.5};
         } else {
@@ -648,15 +634,15 @@ class RangeBomb {
                     this.npc_center.y + (this.target_tile.y+.5 - this.npc_center.y) * (1/3 + (cycles * (19/30))/cycles_per_tick));
         }
     }
-    
-    getImgPath() {
+
+    getImg() {
         let anim_frame = this.animation_frames.shift();
         if (!anim_frame) {
             return null;
         }
-        return `${img_path}${anim_frame}`;
+        return anim_frame;
     }
-    
+
     draw(context) {
         let cp = new Point(this.anim_pos.x * tile_size, this.anim_pos.y * tile_size);
         context.translate(cp.x, cp.y);
@@ -670,17 +656,17 @@ class RangeBomb {
 function getAngleDifference(startAngle, targetAngle) {
     let pi = Math.PI;
     let a = targetAngle - startAngle;
-    
+
     a += a>pi ? -2*pi : a<-pi ? 2*pi : 0;
-    
+
     return Math.round(a*1000)/1000;
 }
 
 /**
  * Resizes the tile board based on the size of the browser window.
- * 
+ *
  * Called whenever the browser window is resized.
- * 
+ *
  * Changes tile_size, tile_stroke, canvas.width, and canvas.height
  */
 function resize() {
@@ -724,7 +710,7 @@ function getClickTarget(event) {
 }
 
 canvas.addEventListener('mousedown', function (event) {
-    
+
     if (!p1.stun_timer) {
         let click_target = getClickTarget(event);
 
@@ -741,7 +727,7 @@ canvas.addEventListener('keydown', function (event) {
         pause_play();
         event.preventDefault();
     }
-    
+
 });
 
 canvas.addEventListener('keypress', function (event) {
@@ -771,10 +757,7 @@ function pause_play() {
     paused = !paused;
     $("pause_btn").innerHTML = paused ? "Play" : "Pause";
     if (paused) {
-//        clearInterval(tick_timer);
         if (verzik.attack_audio) verzik.attack_audio.pause();
-    } else {
-//        tick_timer = setInterval(gameCycles, cycle_length);
     }
 }
 
@@ -787,6 +770,7 @@ function tickNPCs() {
 }
 
 function gameCycles() {
+    if (numAssetsToLoad > 0) {console.log("loading...");return;}
     if (paused) return;
     cycles = (cycles + 1) % cycles_per_tick;
     if(!cycles) { //game tick every .6 sec
@@ -838,7 +822,7 @@ function drawTestTiles() {
 
 /**
  * Draw a rectangle with specified stroke.
- * 
+ *
  * @param {type} x pos
  * @param {type} y pos
  * @param {type} w witdh
@@ -853,8 +837,8 @@ function strokeRect(x, y, w, h, s) {
 }
 
 function drawTileBoard() {
-    ctxt.drawImage(board_img, 0, 0,
-                   board_img.width * draw_scale, board_img.height * draw_scale);
+    ctxt.drawImage(imgs.tile_board, 0, 0,
+                   imgs.tile_board.width * draw_scale, imgs.tile_board.height * draw_scale);
     drawTileMarkers();
     drawVerzikTiles();
     drawMeleeTiles();
@@ -955,6 +939,7 @@ function drawText() {
 }
 
 function drawImgCentered(context, img) {
+    if (img === null) return;
     let draw_x = -draw_scale*img.width/2;
     let draw_y = -draw_scale*img.height/2;
     context.drawImage(img, draw_x, draw_y, draw_scale * img.width, draw_scale * img.height);
@@ -989,9 +974,9 @@ function reset_verzik() {
 
 /**
  * On a new page load, initializes the form data with default values.
- * 
+ *
  * On a page refresh, loads the data already in the form.
- * 
+ *
  */
 function initFormData() {
     if ($("refreshed").value === "0") { //page was newly loaded :: init form data
@@ -1005,7 +990,7 @@ function initFormData() {
         $("color-verzik-marker").value = values["color-verzik-marker"];
         $("color-melee-marker").value = values["color-melee-marker"];
         $("color-tile-marker").value = values["color-tile-marker"];
-        $("refreshed").value = "1"; //set refreshed for next refresh 
+        $("refreshed").value = "1"; //set refreshed for next refresh
     } else {//page was refreshed :: keep and load form data
         updateWeaponSelect("weapon-select");
         values["tile-marker-type"] = $("tile-marker-type").value;
@@ -1021,33 +1006,41 @@ function initFormData() {
     }
 }
 
-function init() {    
+function init() {
+
     cycles = 0;
     ticks = 0;
     paused = false;
     clearInterval(tick_timer);
     tick_timer = null;
-    
+
     p1 = new Player();
     verzik = new NPC({x:6, y:4}, 3);
     verzik.target(p1);
-    
+
     recent_click = null;
-    
+
     initFormData();
-//    pause_play();
+
+    numAssetsToLoad = getNumOfAssets(img_) + getNumOfAssets(sounds_);
+    preloadImages(img_, imgs, img_path, img_ext);
+    preloadAudio(sounds_, sounds, sounds_path, sounds_ext);
+
     tick_timer = setInterval(gameCycles, cycle_length);
 }
 
-function test() {
-    let p1 = new Point(0,0);
-    let p2 = new Point(2,0);
-    let p3 = new Point(0,5);
-    let p4 = new Point(5,0);
-    console.log(p2.distBiased(p1));
-    console.log(p1.distBiased(p3));
-    console.log(p1.distBiased(p4));
-    console.log(p4.distBiased(p1));
+function test1() {
+    for (let i in img_) {
+        if (typeof img_[i] === "string") { //string
+
+        } else if (Array.isArray(img_[i])) { //array of strings
+
+        } else { //object with more named members
+
+        }
+        console.log(`${i} : ${Array.isArray(img_[i])}`);
+        console.log(typeof img_[i]);
+    }
 }
 
 function test2() {
@@ -1067,8 +1060,59 @@ function test2() {
     console.log(`${date.getSeconds()}.${date.getMilliseconds()}`);
 }
 
+function getNumOfAssets(obj_src) {
+    let num = 0;
+    for (let i in obj_src) {
+        if (typeof obj_src[i] === "string") { //static image
+            num++;
+        } else if (Array.isArray(obj_src[i])) { //animation frames
+            num += obj_src[i].length;
+        } else { //object with more categories of image
+            num += getNumOfAssets(obj_src[i]);
+        }
+    }
+    return num;
+}
+
+function preloadImages(obj_src, obj_img, prefix, ext) {
+    for (let i in obj_src) {
+        let src = null;
+        if (typeof obj_src[i] === "string") { //static image
+            src = `${prefix}${i}${ext}`;
+            obj_img[i] = new Image();
+            obj_img[i].onload = ()=>{numAssetsToLoad -= 1;};
+            obj_img[i].src = src;
+        } else if (Array.isArray(obj_src[i])) { //animation frames
+            obj_img[i] = [];
+            for (let frame of obj_src[i]) {
+                src = `${prefix}${i}_${frame}${ext}`;
+                obj_img[i][frame] = new Image();
+                obj_img[i][frame].onload = ()=>{numAssetsToLoad -= 1;};
+                obj_img[i][frame].src = src;
+            }
+        } else { //object with more categories of image
+            obj_img[i] = {};
+            preloadImages(obj_src[i], obj_img[i], `${prefix}${i}_`, ext);
+        }
+    }
+}
+
+function preloadAudio(obj_src, obj_sound, prefix, ext) {
+    for (let i in obj_src) {
+        if (typeof obj_src[i] === "string") {
+            let src = `${prefix}${i}${ext}`;
+            obj_sound[i] = new Audio();
+            obj_sound[i].volume = .2;
+            obj_sound[i].addEventListener('canplaythrough', ()=>{numAssetsToLoad -= 1;}, false);
+            obj_sound[i].src = src;
+        }
+    }
+}
+
 window.onload = function () {
+//    let a = new Audio();
+//    a.addEventListener('canplaythrough', ()=>{console.log("test");}, false);
+//    a.src = "./sounds/verzik_range.m4a";
     init();
     resize();
-    setTimeout(draw, 100);
 };
