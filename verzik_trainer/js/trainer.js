@@ -15,7 +15,8 @@ const img_ = {
     verzik: {idle: ["0","1","2","3","4","5","6","7"],
             attack: ["0","1","2","3","4","5","6","7","8","9"]},
     bomb: {f:  ["0","1","2","3","4","5"],
-           e:  ["0","1","2","3","4","5","6","7","8"]}
+           e:  ["0","1","2","3","4","5","6","7","8"]},
+    x: {red: ["0","1","2","3","4"], yellow: ["0","1","2","3","4"]}
 };
 var sounds = {};
 const sounds_ = {
@@ -78,6 +79,8 @@ var ctxt = canvas.getContext("2d");
 
 
 /// variables that are reset with reset();
+
+var click_x;
 
 var first_click;
 
@@ -380,6 +383,38 @@ class HitSplat {
 
     drawInPlace(context) {
         drawImgCentered(context, this.img);
+    }
+}
+
+class ClickX {
+    constructor() {
+        this.x = 0;
+        this.y = 0;
+        this.img = new Image();
+        this.animation_frames = [];
+    }
+    
+    click(click_target, click_event) {
+        let color = click_target.isNpc ? "red" : "yellow";
+        let click_pos = getCanvasPointFromEvent(click_event);
+        this.x = click_pos.x;
+        this.y = click_pos.y;
+        this.animation_frames = [...imgs.x[color]];
+    }
+
+    getImg() {
+        let anim_frame = this.animation_frames.shift();
+        if (!anim_frame) {
+            return null;
+        }
+        return anim_frame;
+    }
+
+    draw(context) {
+        this.img = this.getImg();
+        context.translate(this.x,this.y);
+        drawImgCentered(context, this.img, false);
+        context.translate(-this.x,-this.y);
     }
 }
 
@@ -760,9 +795,10 @@ canvas.addEventListener('mousedown', function (event) {
     if (numAssetsToLoad > 0) return;
     if (!first_click) first_click = true;
 
+    let click_target = getClickTarget(event);
+    click_x.click(click_target, event);
+        
     if (!p1.stun_timer) {
-        let click_target = getClickTarget(event);
-
         p1.setTargetTile(click_target);
 
         setTimeout(() => {
@@ -858,6 +894,7 @@ function draw() {
     drawTargetTile();
     drawPlayers();
     drawNPCs();
+    drawClickX();
     drawText();
 //    drawTestTiles();
 }
@@ -986,6 +1023,10 @@ function drawNPCs() {
     verzik.draw(ctxt);
 }
 
+function drawClickX() {
+    click_x.draw(ctxt);
+}
+
 function drawText() {
     let font_size = 20;
     ctxt.fillStyle = '#ffffff';
@@ -996,11 +1037,12 @@ function drawText() {
     ctxt.fillText(`Attack Efficiency:\t${getAttackEfficiency()}%`,5, 3*font_size);
 }
 
-function drawImgCentered(context, img) {
+function drawImgCentered(context, img, scale = true) {
+    let d_scale = scale ? draw_scale : 1;
     if (img === null) return;
-    let draw_x = -draw_scale*img.width/2;
-    let draw_y = -draw_scale*img.height/2;
-    context.drawImage(img, draw_x, draw_y, draw_scale * img.width, draw_scale * img.height);
+    let draw_x = -d_scale*img.width/2;
+    let draw_y = -d_scale*img.height/2;
+    context.drawImage(img, draw_x, draw_y, d_scale * img.width, d_scale * img.height);
 }
 
 function updateBoolean(id) {
@@ -1064,6 +1106,8 @@ function initFormData() {
 }
 
 function init() {
+    
+    click_x = new ClickX();
     
     first_click = false;
     
