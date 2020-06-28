@@ -77,9 +77,17 @@ var canvas = $("tile-board");
 var ctxt = canvas.getContext("2d");
 
 
-/// variables that are reset with init();
+/// variables that are reset with reset();
 
-var board_img;
+var first_click;
+
+var first_attack;
+
+var damage_taken;
+var damage_dealt;
+
+var attack_ticks;
+var stalled_ticks;
 
 var cycles; //count .1 second intervals
 var ticks;  //count ticks
@@ -251,13 +259,43 @@ class Player  {
 
     performAttack() {
         console.log(`Attack! with ${this.weapon.NAME}`);
+        
+        if (this.weapon === weapons.SCYTHE) {
+            attack_ticks += this.weapon.CD * 16/15;
+        } else if (this.weapon === weapons.WHIP) {
+            attack_ticks += this.weapon.CD;
+        }
 
         this.attack_cd += this.weapon.CD;
         this.animation_frames = [...imgs[this.weapon.NAME].attack];
 
-//        this.attack_audio = sounds[this.weapon.NAME];
-//        this.attack_audio.play();
+        this.attack_audio = sounds[this.weapon.NAME];
+        this.attack_audio.play();
         this.attack_target.hit(this.weapon);
+        damage_dealt += this.damageDealt();
+    }
+    
+    damageDealt() {
+        let max_hit = 48;
+        let damage = 0;
+        let whip_accuracy = .5512;
+        let scy_accuracy = .5878;
+        if (this.weapon === weapons.SCYTHE) {
+            if (scy_accuracy > Math.random()) {
+                damage += Math.floor(Math.random() * (max_hit+1));
+            }
+            if (scy_accuracy > Math.random()) {
+                damage += Math.floor(Math.random() * (Math.floor(max_hit/2)+1));
+            }
+            if (scy_accuracy > Math.random()) {
+                damage += Math.floor(Math.random() * (Math.floor(max_hit/4)+1));
+            }
+        } else if (this.weapon === weapons.WHIP) {
+            if (whip_accuracy > Math.random()) {
+                damage += Math.floor(Math.random() * (max_hit+1));
+            }
+        }
+        return damage;
     }
 
     hit(dmg) {
@@ -265,6 +303,7 @@ class Player  {
         setTimeout(()=>{
             this.hitsplat = null;
         }, 2 * tick_length);
+        damage_taken += dmg;
     }
 
     stun(t) {
@@ -426,7 +465,15 @@ class NPC {
     }
 
     performAttack() {
-        console.log(`Attack! from verzik`); //TODO
+        console.log(`Attack! from verzik`);
+        
+        //start tracking efficiency at first attack from verzik
+        if (!first_attack) {
+            first_attack = true;
+            attack_ticks = 6;
+            stalled_ticks = ticks;
+        }
+        
         this.attack_cycle += this.attack_speed;
         if (this.bounce_att) {  //bounce attack if in melee range
             this.bounceAttack(this.attack_target);
@@ -463,7 +510,7 @@ class NPC {
 
         attack_target.position = bounce_tile;
 
-        attack_target.hit(25);
+//        attack_target.hit(25);
         attack_target.stun(8);
 
         this.animation_frames = [...imgs.verzik.attack]; //TODO add bounce anim
@@ -710,6 +757,8 @@ function getClickTarget(event) {
 }
 
 canvas.addEventListener('mousedown', function (event) {
+    if (numAssetsToLoad > 0) return;
+    if (!first_click) first_click = true;
 
     if (!p1.stun_timer) {
         let click_target = getClickTarget(event);
@@ -723,6 +772,7 @@ canvas.addEventListener('mousedown', function (event) {
 });
 
 canvas.addEventListener('keydown', function (event) {
+    if (numAssetsToLoad > 0) return;
     if (event.keyCode===32||event.keyCode===80) { // if space-bar or "P" are down
         pause_play();
         event.preventDefault();
@@ -731,6 +781,7 @@ canvas.addEventListener('keydown', function (event) {
 });
 
 canvas.addEventListener('keypress', function (event) {
+    if (numAssetsToLoad > 0) return;
     event.stopPropagation();
 });
 
@@ -771,9 +822,11 @@ function tickNPCs() {
 
 function gameCycles() {
     if (numAssetsToLoad > 0) {console.log("loading...");return;}
+    
     if (paused) return;
     cycles = (cycles + 1) % cycles_per_tick;
-    if(!cycles) { //game tick every .6 sec
+    //game tick every .6 sec, but only after some initial interaction
+    if(!cycles && first_click) {
         gameTick();
     }
     animatePlayers();
@@ -786,6 +839,10 @@ function gameTick() {
     console.log(`tick ${ticks}`);
     tickPlayers();
     tickNPCs();
+}
+
+function getAttackEfficiency() {
+    return Math.min(100, Math.floor(1000*attack_ticks/(ticks-stalled_ticks))/10);
 }
 
 function animateNPCs() {
@@ -930,12 +987,13 @@ function drawNPCs() {
 }
 
 function drawText() {
-    let font_size = 12;
+    let font_size = 20;
     ctxt.fillStyle = '#ffffff';
     ctxt.textAlign = 'start';
     ctxt.font = `${font_size}px ${"Courier"}`;
-    ctxt.fillText(`Damage Taken: ${225}`,5, font_size);
-    ctxt.fillText(`Damage Dealt: ${225}`,5, 2*font_size);
+    ctxt.fillText(`Damage Taken:\t${damage_taken}`,5, font_size);
+    ctxt.fillText(`Damage Dealt:\t${damage_dealt}`,5, 2*font_size);
+    ctxt.fillText(`Attack Efficiency:\t${getAttackEfficiency()}%`,5, 3*font_size);
 }
 
 function drawImgCentered(context, img) {
@@ -966,8 +1024,7 @@ function updatePing() {
     $("ping-display").innerHTML = ping + " ms";
 }
 
-function reset_verzik() {
-    var btn = $("reset_btn");
+function reset() {
     pause_play();
     init();
 }
@@ -1007,6 +1064,16 @@ function initFormData() {
 }
 
 function init() {
+    
+    first_click = false;
+    
+    first_attack = false;
+    
+    damage_taken = 0;
+    damage_dealt = 0;
+
+    attack_ticks = 4;
+    stalled_ticks = 0;
 
     cycles = 0;
     ticks = 0;
@@ -1029,32 +1096,17 @@ function init() {
     tick_timer = setInterval(gameCycles, cycle_length);
 }
 
-function test1() {
-    for (let i in img_) {
-        if (typeof img_[i] === "string") { //string
-
-        } else if (Array.isArray(img_[i])) { //array of strings
-
-        } else { //object with more named members
-
-        }
-        console.log(`${i} : ${Array.isArray(img_[i])}`);
-        console.log(typeof img_[i]);
-    }
-}
-
-function test2() {
-//    let r = Math.random();
+function test() {
     let max = 1000000;
     let date = new Date();
     console.log(`${date.getSeconds()}.${date.getMilliseconds()}`);
 //    for (let i = 0; i < max; i++) {
-//        r = Math.floor(r*1000)/1000;
+//    
 //    }
     date = new Date();
     console.log(`${date.getSeconds()}.${date.getMilliseconds()}`);
 //    for (let i = 0; i < max; i++) {
-//        r = parseFloat(r.toFixed(3));
+//    
 //    }
     date = new Date();
     console.log(`${date.getSeconds()}.${date.getMilliseconds()}`);
@@ -1110,9 +1162,6 @@ function preloadAudio(obj_src, obj_sound, prefix, ext) {
 }
 
 window.onload = function () {
-//    let a = new Audio();
-//    a.addEventListener('canplaythrough', ()=>{console.log("test");}, false);
-//    a.src = "./sounds/verzik_range.m4a";
     init();
     resize();
 };

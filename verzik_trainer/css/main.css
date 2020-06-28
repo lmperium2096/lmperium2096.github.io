@@ -5,7 +5,14 @@
     src: url('fonts/runescape_uf.ttf') format('truetype');
 }*/
 
-html {
+@font-face {
+    font-family: 'RuneScape UF Regular';
+    font-style: normal;
+    font-weight: normal;
+    src: local('RuneScape UF Regular'), url('runescape_uf.woff') format('woff');
+}
+
+* {
     
 }
 
