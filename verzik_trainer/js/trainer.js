@@ -72,7 +72,7 @@ var values = {
     "color-tile-indicator": "#ffffff" //add "20" to make semi-transparent
 };
 
-var ping = 30;
+var ping = 90;
 
 var canvas = $("tile-board");
 var ctxt = canvas.getContext("2d");
