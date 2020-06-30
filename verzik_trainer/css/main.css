@@ -48,7 +48,7 @@ h3 {
     padding: 10px 10px;
 }
 
-#ping-display {
+#ping-display, #volume-display {
     padding: 3px 5px 0 5px;
     border: 1px solid #888;
 }

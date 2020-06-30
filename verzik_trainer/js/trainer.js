@@ -72,7 +72,8 @@ var values = {
     "color-tile-indicator": "#ffffff" //add "20" to make semi-transparent
 };
 
-var ping = 90;
+var ping = 30;
+var volume = 20;
 
 var canvas = $("tile-board");
 var ctxt = canvas.getContext("2d");
@@ -157,6 +158,10 @@ class Player  {
         this.weapon = weapons[values["weapon-select"]];
         this.img = new Image();
         this.animation_frames = [];
+        this.max_hp = 99;
+        this.hp = 99;
+        this.max_str = 118;
+        this.str = 118;
         this.attack_cd = 0;         //attack cool-down timer in ticks
         this.attack_audio = null;
         this.stun_timer = 0;
@@ -274,12 +279,13 @@ class Player  {
 
         this.attack_audio = sounds[this.weapon.NAME];
         this.attack_audio.play();
-        this.attack_target.hit(this.weapon);
-        damage_dealt += this.damageDealt();
+        let dmg = this.damageDealt();
+        this.attack_target.hit(dmg);
+        damage_dealt += dmg;
     }
     
     damageDealt() {
-        let max_hit = 48;
+        let max_hit = 48 * this.str / this.max_str; // temporary dmg reduction
         let damage = 0;
         let whip_accuracy = .5512;
         let scy_accuracy = .5878;
@@ -455,8 +461,10 @@ class NPC {
         this.attack_speed = 4;
         this.img;
         this.animation_frames = [];
-        this.attack_audio = null;
+        this.max_hp = 3250;
+        this.hp = 3250;
         this.attack_cycle = 4;      //attack cycle counter in ticks
+        this.attack_audio = null;
     }
 
     target(player) {
@@ -550,7 +558,7 @@ class NPC {
 
         this.animation_frames = [...imgs.verzik.attack]; //TODO add bounce anim
         this.attack_audio = sounds.verzik_bounce.cloneNode();
-        this.attack_audio.volume = .2;
+        this.attack_audio.volume = volume/100;
         this.attack_audio.play();
     }
 
@@ -558,12 +566,13 @@ class NPC {
 
         this.animation_frames = [...imgs.verzik.attack];
         this.attack_audio = sounds.verzik_range.cloneNode();
-        this.attack_audio.volume = .2;
+        this.attack_audio.volume = volume/100;
         this.attack_audio.play();
     }
 
-    hit(wep) {
+    hit(dmg) {
         let defend_audio = sounds.verzik_hit;
+        this.hp -= dmg;
         defend_audio.play();
     }
 
@@ -1066,6 +1075,11 @@ function updatePing() {
     $("ping-display").innerHTML = ping + " ms";
 }
 
+function updateVolume() {
+    volume = $("volume-select").value;
+    $("volume-display").innerHTML = volume + "%";
+}
+
 function reset() {
     pause_play();
     init();
@@ -1102,6 +1116,7 @@ function initFormData() {
         values["color-melee-marker"] = $("color-melee-marker").value;
         values["color-tile-marker"] = $("color-tile-marker").value;
         updatePing(); //need to update ping-display as well
+        updateVolume(); //need to update ping-display as well
     }
 }
 
@@ -1198,7 +1213,7 @@ function preloadAudio(obj_src, obj_sound, prefix, ext) {
         if (typeof obj_src[i] === "string") {
             let src = `${prefix}${i}${ext}`;
             obj_sound[i] = new Audio();
-            obj_sound[i].volume = .2;
+            obj_sound[i].volume = volume/100;
             obj_sound[i].addEventListener('canplaythrough', ()=>{numAssetsToLoad -= 1;}, false);
             obj_sound[i].src = src;
         }
