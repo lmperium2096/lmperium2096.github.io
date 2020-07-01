@@ -72,8 +72,8 @@ var values = {
     "color-tile-indicator": "#ffffff" //add "20" to make semi-transparent
 };
 
-var ping = 30;
-var volume = 20;
+var ping = 50;
+var volume = 50;
 
 var canvas = $("tile-board");
 var ctxt = canvas.getContext("2d");
@@ -84,14 +84,17 @@ var ctxt = canvas.getContext("2d");
 var click_x;
 
 var first_click;
-
 var first_attack;
+var attacks_used;
 
 var damage_taken;
 var damage_dealt;
 
 var attack_ticks;
 var stalled_ticks;
+
+var dead;
+var victorious;
 
 var cycles; //count .1 second intervals
 var ticks;  //count ticks
@@ -145,24 +148,26 @@ class Point {
 }
 
 class Player  {
-    constructor() {
-        this.position = new Point(3, 5); //default start
-        this.prev_pos = new Point(3, 5);
+    constructor(pos) {
+        this.position = new Point(pos.x, pos.y); //default start
+        this.prev_pos = new Point(pos.x, pos.y);
+        this.size = 1;
         this.target_tile = null;        //the tile on which to draw a tile indicator, the next target_tile_server
         this.target_tile_server = null; //target_tile as seen by the 'server', delayed by ping
         this.path_tiles = [];           //array of tiles in path to target_tile_server
         this.attack_target = null;      //the npc being targetted for attack
         this.focus_angle = null;        //the center point of the player's focus
         this.anim_angle = 0;            //the direction in which the player is facing
-        this.anim_pos = new Point(3, 5);
+        this.anim_pos = new Point(pos.x, pos.y);
         this.weapon = weapons[values["weapon-select"]];
         this.img = new Image();
         this.animation_frames = [];
         this.max_hp = 99;
         this.hp = 99;
-        this.max_str = 118;
+        this.hp_bar = new HpBar(this);
+        this.max_str = 99;
         this.str = 118;
-        this.attack_cd = 0;         //attack cool-down timer in ticks
+        this.attack_cd = 0;             //attack cool-down timer in ticks
         this.attack_audio = null;
         this.stun_timer = 0;
         this.stun_birds = null;
@@ -268,6 +273,8 @@ class Player  {
     performAttack() {
         console.log(`Attack! with ${this.weapon.NAME}`);
         
+        attacks_used += 1;
+        
         if (this.weapon === weapons.SCYTHE) {
             attack_ticks += this.weapon.CD * 16/15;
         } else if (this.weapon === weapons.WHIP) {
@@ -285,7 +292,7 @@ class Player  {
     }
     
     damageDealt() {
-        let max_hit = 48 * this.str / this.max_str; // temporary dmg reduction
+        let max_hit = 48 * (this.str / this.max_str) * (99/118) ; // temp
         let damage = 0;
         let whip_accuracy = .5512;
         let scy_accuracy = .5878;
@@ -308,11 +315,14 @@ class Player  {
     }
 
     hit(dmg) {
+        damage_taken += dmg;
+        this.hp -= dmg;
+        this.hp_bar.display();
         this.hitsplat = new HitSplat(dmg);
         setTimeout(()=>{
             this.hitsplat = null;
         }, 2 * tick_length);
-        damage_taken += dmg;
+        if (this.hp <= 0) death();
     }
 
     stun(t) {
@@ -376,10 +386,42 @@ class Player  {
         drawImgCentered(context, this.img);
         context.rotate(-this.anim_angle);
         if (this.stun_timer) this.stun_birds.drawInPlace(context);
+        if (this.hp_bar.show) this.hp_bar.drawInPlace(context);
         if (this.hitsplat) this.hitsplat.drawInPlace(context);
         context.translate(-(this.anim_pos.x +.5)*tile_size,-(this.anim_pos.y +.5)*tile_size);
     }
 
+}
+
+class HpBar {
+    constructor(owner) {
+        this.owner = owner;
+        this.show = 0;
+    }
+    
+    display() {
+        this.show += 1;
+        setTimeout(()=>{
+            this.hide();
+        }, 9.5 * tick_length);
+    }
+    
+    hide() {
+        this.show -= 1;
+    }
+
+    drawInPlace(context) {
+        let w = 30;
+        let h = 5;
+        let xpos = Math.round(-w/2);
+        let ypos = Math.round(-tile_size * this.owner.size/3 - h/2);
+        context.fillStyle = "#ff0000";  //red bar
+        context.fillRect(xpos, ypos, w, h);
+        if (this.owner.hp <= 0) return;
+        let hp_fraction = Math.round(Math.max(1, w * Math.min(1, (this.owner.hp/this.owner.max_hp))));
+        context.fillStyle = "#00ff00";  //green bar
+        context.fillRect(xpos, ypos, hp_fraction, h);
+    }
 }
 
 class HitSplat {
@@ -388,6 +430,27 @@ class HitSplat {
     }
 
     drawInPlace(context) {
+        drawImgCentered(context, this.img);
+    }
+}
+
+class StunBirds {
+    constructor() {
+        this.img = new Image();
+        this.animation_frames = [...imgs.birds];
+    }
+
+    getImg() {
+        let anim_frame = this.animation_frames.shift();
+        if (!anim_frame) {
+            this.animation_frames = [...imgs.birds];
+            anim_frame = this.animation_frames.shift();
+        }
+        return anim_frame;
+    }
+
+    drawInPlace(context) {
+        this.img = this.getImg();
         drawImgCentered(context, this.img);
     }
 }
@@ -424,27 +487,6 @@ class ClickX {
     }
 }
 
-class StunBirds {
-    constructor() {
-        this.img = new Image();
-        this.animation_frames = [...imgs.birds];
-    }
-
-    getImg() {
-        let anim_frame = this.animation_frames.shift();
-        if (!anim_frame) {
-            this.animation_frames = [...imgs.birds];
-            anim_frame = this.animation_frames.shift();
-        }
-        return anim_frame;
-    }
-
-    drawInPlace(context) {
-        this.img = this.getImg();
-        drawImgCentered(context, this.img);
-    }
-}
-
 class NPC {
     constructor(pos, size) {
         this.pos = new Point(pos.x, pos.y);
@@ -461,8 +503,9 @@ class NPC {
         this.attack_speed = 4;
         this.img;
         this.animation_frames = [];
-        this.max_hp = 3250;
-        this.hp = 3250;
+        this.max_hp = 750;
+        this.hp = 750;
+        this.hp_bar = new HpBar(this);
         this.attack_cycle = 4;      //attack cycle counter in ticks
         this.attack_audio = null;
     }
@@ -513,7 +556,7 @@ class NPC {
         //start tracking efficiency at first attack from verzik
         if (!first_attack) {
             first_attack = true;
-            attack_ticks = 6;
+            attack_ticks = 0;
             stalled_ticks = ticks;
         }
         
@@ -558,7 +601,7 @@ class NPC {
 
         this.animation_frames = [...imgs.verzik.attack]; //TODO add bounce anim
         this.attack_audio = sounds.verzik_bounce.cloneNode();
-        this.attack_audio.volume = volume/100;
+        this.attack_audio.volume = volume/300;
         this.attack_audio.play();
     }
 
@@ -566,14 +609,16 @@ class NPC {
 
         this.animation_frames = [...imgs.verzik.attack];
         this.attack_audio = sounds.verzik_range.cloneNode();
-        this.attack_audio.volume = volume/100;
+        this.attack_audio.volume = volume/300;
         this.attack_audio.play();
     }
 
     hit(dmg) {
         let defend_audio = sounds.verzik_hit;
         this.hp -= dmg;
+        this.hp_bar.display();
         defend_audio.play();
+        if (this.hp <= 0) victory();
     }
 
     animate() {
@@ -616,6 +661,7 @@ class NPC {
         context.rotate(this.angle);
         drawImgCentered(context, this.img);
         context.rotate(-this.angle);
+        if (this.hp_bar.show) this.hp_bar.drawInPlace(context);
         context.translate(-cp.x, -cp.y);
 
         if (this.range_bomb) this.range_bomb.draw(context);
@@ -774,7 +820,7 @@ function resize() {
     canvas.width = board_width * tile_size;
     canvas.height = board_height * tile_size;
 
-    if (paused) draw();
+    if (paused || dead || victorious) draw();
 }
 
 function clickedOnNpc(x, y) {
@@ -904,7 +950,11 @@ function draw() {
     drawPlayers();
     drawNPCs();
     drawClickX();
-    drawText();
+    if (dead || victorious) {
+        drawEndStats();
+    } else {
+        drawAtkStats();
+    }
 //    drawTestTiles();
 }
 
@@ -1036,14 +1086,56 @@ function drawClickX() {
     click_x.draw(ctxt);
 }
 
-function drawText() {
+function drawAtkStats() {
     let font_size = 20;
     ctxt.fillStyle = '#ffffff';
     ctxt.textAlign = 'start';
-    ctxt.font = `${font_size}px ${"Courier"}`;
+    ctxt.font = `${font_size}px Courier`;
     ctxt.fillText(`Damage Taken:\t${damage_taken}`,5, font_size);
     ctxt.fillText(`Damage Dealt:\t${damage_dealt}`,5, 2*font_size);
     ctxt.fillText(`Attack Efficiency:\t${getAttackEfficiency()}%`,5, 3*font_size);
+}
+
+function death() {
+    dead = true;
+    clearInterval(tick_timer);
+    tick_timer = null;
+    setTimeout(() => {
+        drawTileBoard();
+        drawPlayers();
+        drawNPCs();
+        drawEndStats();
+    }, tick_length);
+}
+
+function victory() {
+    victorious = true;
+    clearInterval(tick_timer);
+    tick_timer = null;
+    setTimeout(() => {
+        drawTileBoard();
+        drawPlayers();
+        drawNPCs();
+        drawEndStats();
+    }, tick_length);
+}
+
+function drawEndStats() {
+    let w = canvas.width;
+    let h = canvas.height;
+    let font_size = 20;
+    ctxt.fillStyle = "#000000bd";
+    ctxt.fillRect(0,0,w,h);
+    ctxt.fillStyle = "#ffffff";
+    ctxt.textAlign = 'center';
+    ctxt.font = `${1.5*font_size}px Courier`;
+    ctxt.fillText(`You have ${dead?'died':'killed Verzik!'}`,w/2,h/5+2*font_size+10);
+    ctxt.textAlign = 'start';
+    ctxt.font = `${font_size}px Courier`;
+    ctxt.fillText(`Damage Taken:\t${damage_taken}`,w/4 + 20,h/5+2*font_size+10+30+font_size);
+    ctxt.fillText(`Damage Dealt:\t${damage_dealt}`,w/4 + 20,h/5+2*font_size+10+30+2*font_size);
+    ctxt.fillText(`Total Attacks Used:\t${attacks_used}`,w/4 + 20,h/5+2*font_size+10+30+3*font_size);
+    ctxt.fillText(`Attack Efficiency:\t${getAttackEfficiency()}%`,w/4 + 20,h/5+2*font_size+10+30+4*font_size);
 }
 
 function drawImgCentered(context, img, scale = true) {
@@ -1066,7 +1158,7 @@ function updateValue(id) {
 
 function updateWeaponSelect(id) {
     values[id] = $(id).value;
-    p1.weapon = weapons[values[id]];
+    if (p1) p1.weapon = weapons[values[id]];
     if (paused) draw();
 }
 
@@ -1077,12 +1169,12 @@ function updatePing() {
 
 function updateVolume() {
     volume = $("volume-select").value;
+    
+    for (let s in sounds) {
+        sounds[s].volume = volume/300;
+    }
+    
     $("volume-display").innerHTML = volume + "%";
-}
-
-function reset() {
-    pause_play();
-    init();
 }
 
 /**
@@ -1120,13 +1212,11 @@ function initFormData() {
     }
 }
 
-function init() {
-    
-    click_x = new ClickX();
-    
+function reset() {
     first_click = false;
-    
     first_attack = false;
+    
+    attacks_used = 0;
     
     damage_taken = 0;
     damage_dealt = 0;
@@ -1134,41 +1224,34 @@ function init() {
     attack_ticks = 4;
     stalled_ticks = 0;
 
-    cycles = 0;
-    ticks = 0;
-    paused = false;
-    clearInterval(tick_timer);
-    tick_timer = null;
+    dead = false;
+    victorious = false;
 
-    p1 = new Player();
+    p1 = new Player({x:3, y:5});
     verzik = new NPC({x:6, y:4}, 3);
     verzik.target(p1);
 
     recent_click = null;
+    
+    cycles = 0;
+    ticks = 0;
+    paused = false;
+    
+    clearInterval(tick_timer);
+    tick_timer = null;
+    tick_timer = setInterval(gameCycles, cycle_length);
+}
 
+function init() {
+    click_x = new ClickX();
+    
     initFormData();
 
     numAssetsToLoad = getNumOfAssets(img_) + getNumOfAssets(sounds_);
     preloadImages(img_, imgs, img_path, img_ext);
     preloadAudio(sounds_, sounds, sounds_path, sounds_ext);
-
-    tick_timer = setInterval(gameCycles, cycle_length);
-}
-
-function test() {
-    let max = 1000000;
-    let date = new Date();
-    console.log(`${date.getSeconds()}.${date.getMilliseconds()}`);
-//    for (let i = 0; i < max; i++) {
-//    
-//    }
-    date = new Date();
-    console.log(`${date.getSeconds()}.${date.getMilliseconds()}`);
-//    for (let i = 0; i < max; i++) {
-//    
-//    }
-    date = new Date();
-    console.log(`${date.getSeconds()}.${date.getMilliseconds()}`);
+    
+    reset();
 }
 
 function getNumOfAssets(obj_src) {
@@ -1213,11 +1296,27 @@ function preloadAudio(obj_src, obj_sound, prefix, ext) {
         if (typeof obj_src[i] === "string") {
             let src = `${prefix}${i}${ext}`;
             obj_sound[i] = new Audio();
-            obj_sound[i].volume = volume/100;
+            obj_sound[i].volume = volume/300;
             obj_sound[i].addEventListener('canplaythrough', ()=>{numAssetsToLoad -= 1;}, false);
             obj_sound[i].src = src;
         }
     }
+}
+
+function test() {
+    let max = 1000000;
+    let date = new Date();
+    console.log(`${date.getSeconds()}.${date.getMilliseconds()}`);
+//    for (let i = 0; i < max; i++) {
+//    
+//    }
+    date = new Date();
+    console.log(`${date.getSeconds()}.${date.getMilliseconds()}`);
+//    for (let i = 0; i < max; i++) {
+//    
+//    }
+    date = new Date();
+    console.log(`${date.getSeconds()}.${date.getMilliseconds()}`);
 }
 
 window.onload = function () {
